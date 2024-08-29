@@ -4,6 +4,10 @@ import { sql } from '@vercel/postgres';
 import { z } from 'zod';
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+ 
+import { signIn } from '@/auth';
+import { AuthError } from 'next-auth';
+
 const FormSchema = z.object({
   id: z.string(),
   customerId: z.string(),
@@ -27,16 +31,37 @@ export async function createInvoice(formData: FormData) {
     console.log(customerId, amountInCents, status, date);
 
     try {
+        // Simulating an error for testing purposes
+        throw new Error('Simulated error for testing next/error.tsx');
+
         await sql`
             INSERT INTO invoices (customer_id, amount, status, date) 
             VALUES (${customerId}, ${amountInCents}, ${status}, ${date})
         `;
     } catch (error) {
-        return {
-            error: 'Database Error: Failed to create invoices'
-        }
+        // Instead of returning an object, we can throw the error to be caught by the error boundary
+        throw new Error('Database Error: Failed to create invoices');
     }
 
     revalidatePath('/dashboard/invoices');
     redirect('/dashboard/invoices');
+}
+
+export async function authenticate(
+    prevState: string | undefined,
+    formData: FormData,
+  ) {
+    try {
+      await signIn('credentials', formData);
+    } catch (error) {
+      if (error instanceof AuthError) {
+        switch (error.type) {
+          case 'CredentialsSignin':
+            return 'Invalid credentials.';
+          default:
+            return 'Something went wrong.';
+        }
+      }
+      throw error;
+    }
 }
